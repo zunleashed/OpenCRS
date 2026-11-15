@@ -35,14 +35,18 @@
 >    is discontinuous at PO2 = 100 mmHg and physiologically backwards
 >    above it), and `Ik` has an anti-windup leak `−Ik/tau_Ik` (the faithful
 >    cumulative integral winds up without bound under sustained CO2).
->    Fitted values (fit 1, Protocol B on recalibrated set-C base):
->    `k_cg` 8.0, `k_cK` 10.0, `k_ex_g` 0.8, `k_ex_K` 0.5, `tau_Ik` 30 s
->    (published Ishbulatov gains were 20 / 25 / — / — / —). **Gate V2 was
->    NOT passed** — the fitted module fixes the Protocol B stall and the
->    240 bpm HR saturation but the paper test and FiCO2 8% regress and
->    PaCO2 still runs away at Z5 (plant gas-exchange limit). Full results,
->    parameter table and the coupling verdict: evaluation repo README,
->    section "Ben-Tal Layer 1 ventilatory module".
+>    Fitted values (refit 2026-11-15, fixed plant, set-C base — best of 6
+>    jointly scored candidates, joint score 0.239): `k_cg` 20.0,
+>    `k_cK` 35.0, `k_ex_g` 0.8, `k_ex_K` 1.2, `tau_Ik` 30 s
+>    (published Ishbulatov gains were 20 / 25 / — / — / —; fit 1 was
+>    8 / 10 / 0.8 / 0.5 / 30). **Gate V2 is still NOT passed** — the
+>    refit fixes FiCO2 8% (VE 50.4 vs ~51, VT 2.20 exact) and HR
+>    grading (112→187 vs ACSM 129→181) and VE at Z5 (153 vs ~139),
+>    but the paper test still fails (VE 32.3 vs 59.9) and the
+>    VE/RR/VT shape is wrong (deep-slow breathing: VT 3.89 L at Z5
+>    vs ~2.32, RR 39 vs ~60). Full results, sensitivity and the
+>    coupling verdict: evaluation repo README, section "Layer 1 refit
+>    on fixed plant".
 >    Diagnostic stores `PAO2_store`, `PACO2_store`, `Pd5O2_store`,
 >    `Pd5CO2_store` (alveolar + dead-space gas) were added alongside the
 >    Layer 1 diagnostics for the V2 diagnosis; they are read-only
@@ -68,8 +72,10 @@
 >    was 47.6 vs 172.6) — but VE/HR now under-shoot (VE 106.6, HR 138
 >    at Z5) because the fitted knobs were tuned against the broken
 >    plant and leaned on the pathological PaCO2 signal for drive;
->    refitting is a separate step. Full results: evaluation repo README,
->    section "Plant alveolar-VA cap fix".
+>    refit done 2026-11-15 (best set: `k_cg` 20, `k_cK` 35,
+>    `k_ex_g` 0.8, `k_ex_K` 1.2 — see the refit note above). Full
+>    results: evaluation repo README, section "Plant alveolar-VA cap
+>    fix" and section "Layer 1 refit on fixed plant".
 >
 > Everything else — model equations, parameters, calibration — is upstream
 > as of `f0c3c46`. Evaluation of this fork (Protocol B, paper test, FiCO2

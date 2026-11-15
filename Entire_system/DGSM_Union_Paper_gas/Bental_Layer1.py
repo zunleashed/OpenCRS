@@ -138,13 +138,16 @@ BENTAL_DEFAULTS = dict(
     # Carotid O2 receptor, eq 23 (sigmoidal branch only; k5o/k6o unused).
     k1o=-0.5, k2o=-50.0, k3o=20.0, k4o=0.496,
     # Frequency / amplitude drives, eqs 24-25 (published gains).
-    g0=16.0, k_cg=8.0, k_og=60.0,
-    K0=0.75, k_cK=10.0, k_oK=7.5,
+    g0=16.0, k_cg=20.0, k_og=60.0,
+    K0=0.75, k_cK=35.0, k_oK=7.5,
     # Integral weights, eq 26.
     k1_Ik=0.1, k2_Ik=0.1,
     # Layer 1 adaptations / new terms (see module docstring).
-    tau_Ik=30.0,          # s, anti-windup leak (fit 1; V1 at 60 s)
-    k_ex_g=0.8, k_ex_K=0.5,  # FITTED fit 1 (Protocol B, set-C base)
+    tau_Ik=30.0,          # s, anti-windup leak (fit 1; V1 at 60 s; refit kept 30 s)
+    k_ex_g=0.8, k_ex_K=1.2,  # FITTED refit 2026-11-15 (fixed plant; eval repo
+    # README "Layer 1 refit on fixed plant"). k_cg/k_cK are now at/above
+    # published Ishbulatov gains (20/25); k_ex_g held at fit-1 0.8, k_ex_K
+    # 0.5 -> 1.2. Joint score 0.239 (best of 6 candidates); V2 NOT passed.
     # Option (a) map scales (fixed by operating-range argument).
     BF_rest=0.20, VT_rest=0.50, s_BF=0.03, s_VT=0.15,
 )
