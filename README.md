@@ -3,9 +3,9 @@
 > **Fork note (zunleashed/OpenCRS, Zone 5 fork).** This is a fork of
 > [Sheng-Ya/OpenCRS](https://github.com/Sheng-Ya/OpenCRS) at upstream commit
 > `f0c3c4612f310017f07d5e67353d7a770034c396`, MIT licence (see `LICENSE`).
-> Upstream is unchanged except for exactly three changes: the two to raise
+> Upstream is unchanged except for exactly four changes: the two to raise
 > the ventilatory ceiling (below), plus the Ben-Tal Layer 1 ventilatory
-> module (change 3).
+> module (change 3), plus the dynamic muscle-pressure fix (change 4).
 >
 > 1. **VAflow clamp parameterised** — `Entire_system/DGSM_Union_Paper_gas/All_derivatives_njit.py:242`:
 >    `VAflow = min(max(VAflow, 0.04), 1.6)` → `min(max(VAflow, 0.04), VAflow_max)`,
@@ -47,6 +47,29 @@
 >    `Pd5CO2_store` (alveolar + dead-space gas) were added alongside the
 >    Layer 1 diagnostics for the V2 diagnosis; they are read-only
 >    diagnostics, not model changes.
+> 4. **Dynamic muscle pressure in the breath optimiser** —
+>    `Resp_Control_Breath_Optimiser.py` (`compute_constants`, in both
+>    copies of the file — the fork ships it at the repo root and under
+>    `Entire_system/DGSM_Union_Paper_gas/`, and the harness imports the
+>    root copy): the muscle-pressure quadratic coefficient `a2` is now
+>    solved so the true solution of the equation of motion
+>    `R_rs*dV/dt + E_rs*V = P_musc(t)`, `V(0) = 0`, reaches `Vt1` at `t1`
+>    (closed form, `a2 = Vt1*R_rs/(I2 - t1^2*I0)`), instead of the old
+>    quasi-static `Pt1 = P_ao + E_rs*Vt1`. The old choice ignored the
+>    resistive drop, so the ODE solution fell short of `Vt1` by `d1`
+>    (25% at Z5) and the `V(t)` formula patched the endpoint with a
+>    spurious constant — the `dV/dt` fed to gas exchange was only 0.38x
+>    the true volume rate at Z5, the dead-space cascade flushed 2.6x
+>    slow, and effective alveolar ventilation saturated ~48 L/min
+>    (PaCO2 → 91 mmHg). With the fix `d1 = 0` and `dV/dt` is the true
+>    derivative of `V(t)` at rest, paper exercise and Z5. Effect (same
+>    Layer 1 fit-1 knobs): Protocol B PaCO2 43.8–46.7 mmHg every zone
+>    (was 54–91), VA_eff tracks nominal VA (92.9 vs 88.1 L/min at Z5,
+>    was 47.6 vs 172.6) — but VE/HR now under-shoot (VE 106.6, HR 138
+>    at Z5) because the fitted knobs were tuned against the broken
+>    plant and leaned on the pathological PaCO2 signal for drive;
+>    refitting is a separate step. Full results: evaluation repo README,
+>    section "Plant alveolar-VA cap fix".
 >
 > Everything else — model equations, parameters, calibration — is upstream
 > as of `f0c3c46`. Evaluation of this fork (Protocol B, paper test, FiCO2

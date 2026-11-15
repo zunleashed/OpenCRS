@@ -14,18 +14,38 @@ base_times = np.linspace(0, T_max, n_steps)
 @njit
 def compute_constants(t1, t2, VA, VD, E_rs, R_rs, P_ao, tolerance):
     """
-    Compute constants for the respiratory model
+    Compute constants for the respiratory model.
+
+    Dynamic (not quasi-static) muscle pressure. The equation of motion is
+    R_rs*dV/dt + E_rs*V = P_musc(t), P_musc = a1*t + a2*t^2 with the peak at
+    t1 (a1 = -2*a2*t1). The old quasi-static choice set the end-inspiratory
+    pressure Pt1 = P_ao + E_rs*Vt1, i.e. it balanced only the elastic recoil
+    and ignored the resistive drop R_rs*dV/dt. The true ODE solution then
+    fell short of Vt1 by d1 (2% of Vt1 at rest, 11% at paper exercise, 25%
+    at Z5), and the V(t) formula patched the endpoint with a spurious
+    constant d1 -- so the dV/dt fed to gas exchange was only 0.38x the true
+    volume rate at Z5, the dead-space cascade flushed 2.6x slow, and
+    effective alveolar ventilation saturated ~48 L/min (PaCO2 -> 91 mmHg).
+    Here a2 is instead solved so the true ODE solution with V(0) = 0 reaches
+    Vt1 at t1: V(t1) = (a2*bracket)/R_rs with bracket = I2 - t1^2*I0 < 0
+    (closed form; P_ao = 0 in the current parameter set, so the airway
+    opening term drops out). With this a2 the d1 patch is identically zero
+    and the returned dV/dt is the true derivative of V(t).
     """
     # Precompute key values
-    a2 = (-P_ao - E_rs * VA * (t1 + t2) - E_rs * VD) / (t1 ** 2)
+    Vt1 = VA * (t1 + t2) + VD
+    B = E_rs / R_rs
+    eBT = np.exp(-B * t1)
+    I0 = (1.0 - eBT) / B
+    I2 = (2.0 - eBT * (B * B * t1 * t1 + 2.0 * B * t1 + 2.0)) / (B ** 3)
+    bracket = I2 - t1 * t1 * I0
+    a2 = (Vt1 * R_rs) / bracket
     a1 = -2 * a2 * t1
     Pt1 = a1 * t1 + a2 * (t1 ** 2)
-    Vt1 = VA * (t1 + t2) + VD
     # tau = max((t2 / (-np.log(tolerance * R_rs / Pt1))), 0.001)
     raw_tau = 0.5 * t2 / (-np.log(tolerance * R_rs / Pt1))
     tau_min = 0.001
     tau = np.sqrt(raw_tau * raw_tau + tau_min * tau_min)
-    B = E_rs / R_rs
 
     return a1, a2, Pt1, Vt1, tau, B
 
