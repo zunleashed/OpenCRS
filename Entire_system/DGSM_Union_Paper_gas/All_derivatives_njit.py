@@ -2,6 +2,7 @@ import numpy as np
 import math
 from Activation_Functions import activation_H, activation_H_derivative
 from Resp_Control_Breath_Optimiser import calculate_single_V_dV_dt
+from Bental_Layer1 import bental_layer1_drive  # Ben-Tal Layer 1 (fork)
 from numba import njit
 
 @njit
@@ -160,7 +161,7 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
         dPa_O2_dt, dPa_CO2_dt, PA_O2, PA_CO2, PCSFCO2, MRTO2, MRTCO2, CTO2, CvtCO2, CBO2, CvbCO2, MRV,
 
         # Resp control state variable
-        VE_integral
+        VE_integral, Ik  # Ik: Ben-Tal Layer 1 integral state (Ishbulatov eq 26)
     ) = state
 
     # ============================================================================
@@ -192,7 +193,11 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
      scale_param1, scale_param3, scale_param4, scale_param6,
      Pa_O2_lower, rise_time_atr, rise_time_ven,
      fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale,
-     VAflow_max
+     VAflow_max,
+     # Ben-Tal Layer 1 (Ishbulatov 2022 Table 1 + new terms; see Bental_Layer1.py)
+     k1c, k2c, k3c, k4c, k1o, k2o, k3o, k4o,
+     g0, k_cg, k_og, K0, k_cK, k_oK, k1_Ik, k2_Ik,
+     k_ex_g, k_ex_K, tau_Ik, BF_rest, VT_rest, s_BF, s_VT
     ) = Input_Parameters
 
     # Determine the correct index based on t
@@ -238,9 +243,22 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
         Pb_CO2 = PvbCO2 + (PCSFCO2 - PvbCO2) * math.exp(-dc * (math.sqrt(Q_bp_1000 * KCCO2)))
         PmbCO2 = Pb_CO2
 
-    G3 = KpO2 * ((PAMO2_nominal - PamO2) ** scale_param1) if PamO2 < PAMO2_nominal else 0
-    VAflow = VA_rest * (KpCO2 * PamCO2 + KcCO2 * PmbCO2 + G3 + KcMRV * max(0, MRV) - (KpCO2 + KcCO2) * PaCO2_n)
-    VAflow = min(max(VAflow, 0.04), VAflow_max)
+    # ============================================================================
+    # BEN-TAL LAYER 1 VENTILATORY DRIVE (replaces the old VAflow equation)
+    # Ishbulatov 2022 eqs 22-26 + exercise feedforward; see Bental_Layer1.py.
+    # Inputs are the breath-averaged gases (recomputed at breath boundaries
+    # above, else carried from stores) and MRV (lagged metabolic ratio).
+    # The old drive (VA_rest*(KpCO2*PamCO2 + KcCO2*PmbCO2 + G3 +
+    # KcMRV*max(0,MRV) - (KpCO2+KcCO2)*PaCO2_n), clamped to 1.6 L/s) is
+    # removed: it pinned VE at 114 L/min from Z1 and let PaCO2 run to
+    # 104 mmHg. VAflow_max = 3.5 L/s (fork hard ceiling) still applies.
+    # ============================================================================
+    v_c, v_o, g_tilde, K_amp, dIk_dt, BF_ctl, VT_ctl, VAflow = bental_layer1_drive(
+        PmbCO2, PamO2, MRV, Ik,
+        k1c, k2c, k3c, k4c, k1o, k2o, k3o, k4o,
+        g0, k_cg, k_og, K0, k_cK, k_oK, k1_Ik, k2_Ik, tau_Ik,
+        k_ex_g, k_ex_K, BF_rest, VT_rest, s_BF, s_VT,
+        GV_dead, V0_dead, VAflow_max)
     VD = GV_dead * VAflow + V0_dead
 
     if time_since_last_breath > (t1 + t2) or t == 0:
@@ -251,8 +269,16 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
 
         time_since_last_breath = t - finish_breath_time
 
-        t1 = eval_spline(VAflow, knots_1, cs_t1)
-        t2 = eval_spline(VAflow, knots_2, cs_t2)
+        # Breath timing (option (a) map): the spline is used ONLY for the
+        # inspiratory fraction at the computed VAflow; t1/t2 then follow
+        # from the controller frequency BF_ctl, preserving the two
+        # controlled DOF (frequency from g_tilde, amplitude from K_amp).
+        # A spline-only lookup would collapse them back into one DOF.
+        t1_spline = eval_spline(VAflow, knots_1, cs_t1)
+        t2_spline = eval_spline(VAflow, knots_2, cs_t2)
+        frac_insp = t1_spline / (t1_spline + t2_spline)
+        t1 = frac_insp / BF_ctl
+        t2 = (1.0 - frac_insp) / BF_ctl
     # ============================================================================
     # RESPIRATORY MECHANICS
     # ============================================================================
@@ -1074,7 +1100,11 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
             dPA_CO2_dt, dPCSFCO2_dt, dMRTO2_dt, dMRTCO2_dt, dCTO2_dt, dCvtCO2_dt, dCBO2_dt, dCvbCO2_dt, dMRV_dt,
 
             # resp control derivatives
-            d_VE_integral_dt)
+            d_VE_integral_dt, dIk_dt,
+
+            # Ben-Tal Layer 1 diagnostics (not derivatives; written to
+            # stores by model_derivatives_njit for the 1 Hz drain)
+            v_c, v_o, g_tilde, K_amp, Ik, PA_O2, PA_CO2, Pd_5_O2, Pd_5_CO2)
 
 
 @njit(error_model="numpy")
@@ -1094,6 +1124,9 @@ def model_derivatives_njit(
     P_la_store, V_la_store, V_ra_store, P_ra_store, P_lv_store,
     phi_atr_store, phi_store, tidal_store, VAflow_store, Q_pp_store,
     dP_rv_dt_store, dP_lv_dt_store, P_peri_store,
+    # Ben-Tal Layer 1 diagnostic stores (appended; order matches _RHS_WRITE_KEYS)
+    gt_store, K_store, vc_store, vo_store, Ik_store,
+    PAO2_store, PACO2_store, Pd5O2_store, Pd5CO2_store,
 ):
     """
         Main model derivatives function with improved organization
@@ -1134,7 +1167,10 @@ def model_derivatives_njit(
      dPA_CO2_dt, dPCSFCO2_dt, dMRTO2_dt, dMRTCO2_dt, dCTO2_dt, dCvtCO2_dt, dCBO2_dt, dCvbCO2_dt, dMRV_dt,
 
      # resp control derivatives
-     d_VE_integral_dt
+     d_VE_integral_dt, dIk_dt,
+
+     # Ben-Tal Layer 1 diagnostics (not derivatives)
+     v_c, v_o, g_tilde, K_amp, Ik, PA_O2, PA_CO2, Pd_5_O2, Pd_5_CO2
 
 
      ) = njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Parameters, HR_store,
@@ -1212,6 +1248,17 @@ def model_derivatives_njit(
     PamCO2_store[store_index] = PamCO2
     PmbCO2_store[store_index] = PmbCO2
 
+    # Ben-Tal Layer 1 diagnostics
+    gt_store[store_index] = g_tilde
+    K_store[store_index] = K_amp
+    vc_store[store_index] = v_c
+    vo_store[store_index] = v_o
+    Ik_store[store_index] = Ik
+    PAO2_store[store_index] = PA_O2
+    PACO2_store[store_index] = PA_CO2
+    Pd5O2_store[store_index] = Pd_5_O2
+    Pd5CO2_store[store_index] = Pd_5_CO2
+
 
     return np.array((  # cardio derivatives
         dVT_pa_dt, dVT_pp_dt, dVT_pv_dt, dQ_pa_dt, dVT_la_dt, dVT_lv_dt, dVT_ra_dt, dVT_rv_dt, dVT_sv_dt,
@@ -1233,7 +1280,7 @@ def model_derivatives_njit(
         dPA_CO2_dt, dPCSFCO2_dt, dMRTO2_dt, dMRTCO2_dt, dCTO2_dt, dCvtCO2_dt, dCBO2_dt, dCvbCO2_dt, dMRV_dt,
 
         # resp control derivatives
-        d_VE_integral_dt
+        d_VE_integral_dt, dIk_dt
     ))
 
 
@@ -1257,6 +1304,9 @@ _RHS_WRITE_KEYS = (
     "P_lv_store", "phi_atr_store", "phi_store", "tidal_store",
     "VAflow_store", "Q_pp_store", "dP_rv_dt_store", "dP_lv_dt_store",
     "P_peri_store",
+    # Ben-Tal Layer 1 diagnostics (order matches model_derivatives_njit)
+    "gt_store", "K_store", "vc_store", "vo_store", "Ik_store",
+    "PAO2_store", "PACO2_store", "Pd5O2_store", "Pd5CO2_store",
 )
 
 

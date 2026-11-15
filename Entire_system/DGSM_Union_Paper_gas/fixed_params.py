@@ -17,6 +17,16 @@ Parameters = {
     "Pmax_dot": 1000.0,
     # Fork (Z5): see Entire_system/fixed_params.py — default 3.5 L/s.
     "VAflow_max": 3.5,
+    # Ben-Tal Layer 1 ventilatory module (see Bental_Layer1.py; kept in
+    # sync with Entire_system/fixed_params.py). Published values:
+    # Ishbulatov et al. 2022, Mathematics 10:1088, Table 1, eqs 22-26.
+    "k1c": 0.585, "k2c": 61.0, "k3c": 20.7, "k4c": 0.442,
+    "k1o": -0.5, "k2o": -50.0, "k3o": 20.0, "k4o": 0.496,
+    "g0": 16.0, "k_cg": 8.0, "k_og": 60.0,
+    "K0": 0.75, "k_cK": 10.0, "k_oK": 7.5,
+    "k1_Ik": 0.1, "k2_Ik": 0.1,
+    "tau_Ik": 30.0, "k_ex_g": 0.8, "k_ex_K": 0.5,
+    "BF_rest": 0.20, "VT_rest": 0.50, "s_BF": 0.03, "s_VT": 0.15,
     # "E_rs": 21.9,
     # "R_rs": 3.02,
     # "C_jp": 3.72,

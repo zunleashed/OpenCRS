@@ -86,5 +86,6 @@ Initial_Conditions = {
     'CvbCO2': 0.54980383,
     'MRV': 0.0,
     'VE_integral': 0.0,
+    'Ik': 0.0,  # Ben-Tal Layer 1 integral state (Ishbulatov eq 26)
 
 }

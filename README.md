@@ -3,8 +3,9 @@
 > **Fork note (zunleashed/OpenCRS, Zone 5 fork).** This is a fork of
 > [Sheng-Ya/OpenCRS](https://github.com/Sheng-Ya/OpenCRS) at upstream commit
 > `f0c3c4612f310017f07d5e67353d7a770034c396`, MIT licence (see `LICENSE`).
-> Upstream is unchanged except for exactly two changes, both to raise the
-> ventilatory ceiling so the model can simulate exercise up to ~95% VO2max:
+> Upstream is unchanged except for exactly three changes: the two to raise
+> the ventilatory ceiling (below), plus the Ben-Tal Layer 1 ventilatory
+> module (change 3).
 >
 > 1. **VAflow clamp parameterised** — `Entire_system/DGSM_Union_Paper_gas/All_derivatives_njit.py:242`:
 >    `VAflow = min(max(VAflow, 0.04), 1.6)` → `min(max(VAflow, 0.04), VAflow_max)`,
@@ -21,6 +22,31 @@
 >    (`minimise_breathing`): `np.linspace(0.04, 1.6, 200)` →
 >    `np.linspace(0.04, VAflow_max, 440)`, keeping the original ~0.0078 L/s
 >    knot spacing; `VAflow_max` is passed in from `simulate_cpu`.
+> 3. **Ben-Tal Layer 1 ventilatory module** —
+>    `Entire_system/DGSM_Union_Paper_gas/Bental_Layer1.py` (new file) replaces
+>    only the ventilatory-drive block in `All_derivatives_njit.py` (the
+>    VAflow equation + breath-timing t1/t2 splines). Sigmoidal chemoreceptors
+>    (Ishbulatov et al. 2022, *Mathematics* 10:1088, eqs 22–26) driving
+>    separate frequency/amplitude outputs, plus a new exercise-feedforward
+>    term (`k_ex`, no paper contains one) driven by OpenCRS's lagged
+>    metabolic ratio MRV. State `Ik` added (83-state RHS). Two documented
+>    adaptations of the published equations: the carotid-O2 receptor uses
+>    the sigmoidal branch of eq 23 for all PO2 (the printed piecewise form
+>    is discontinuous at PO2 = 100 mmHg and physiologically backwards
+>    above it), and `Ik` has an anti-windup leak `−Ik/tau_Ik` (the faithful
+>    cumulative integral winds up without bound under sustained CO2).
+>    Fitted values (fit 1, Protocol B on recalibrated set-C base):
+>    `k_cg` 8.0, `k_cK` 10.0, `k_ex_g` 0.8, `k_ex_K` 0.5, `tau_Ik` 30 s
+>    (published Ishbulatov gains were 20 / 25 / — / — / —). **Gate V2 was
+>    NOT passed** — the fitted module fixes the Protocol B stall and the
+>    240 bpm HR saturation but the paper test and FiCO2 8% regress and
+>    PaCO2 still runs away at Z5 (plant gas-exchange limit). Full results,
+>    parameter table and the coupling verdict: evaluation repo README,
+>    section "Ben-Tal Layer 1 ventilatory module".
+>    Diagnostic stores `PAO2_store`, `PACO2_store`, `Pd5O2_store`,
+>    `Pd5CO2_store` (alveolar + dead-space gas) were added alongside the
+>    Layer 1 diagnostics for the V2 diagnosis; they are read-only
+>    diagnostics, not model changes.
 >
 > Everything else — model equations, parameters, calibration — is upstream
 > as of `f0c3c46`. Evaluation of this fork (Protocol B, paper test, FiCO2

@@ -110,7 +110,7 @@ IC_cardio_contr = np.array([Initial_Conditions[key] for key in required_cardio_c
 num_cardio_control = len(required_cardio_control_keys)
 
 # resp control ventilation
-required_resp_control_keys = ["VE_integral"]
+required_resp_control_keys = ["VE_integral", "Ik"]  # Ik: Ben-Tal Layer 1
 IC_resp_contr = np.array([Initial_Conditions[key] for key in required_resp_control_keys], dtype=float)
 num_resp_control = len(required_resp_control_keys)
 
@@ -334,6 +334,16 @@ def simulate_cpu(
     (Current_Parameters[k] if k in Current_Parameters else old_parameters[k] for k in ["GV_dead", "KcCO2", "KcMRV", "KpCO2", "KpO2",
    "V0_dead", "VA_rest", "lambda1", "lambda2", "n", "Pmax", "Pmax_dot", "E_rs", "R_rs", "P_ao", "VAflow_max"])
 
+    # Ben-Tal Layer 1 (Ishbulatov 2022 Table 1 + new terms; defaults in
+    # fixed_params.py, overridable via Current_Parameters / harness overrides)
+    (k1c, k2c, k3c, k4c, k1o, k2o, k3o, k4o,
+     g0, k_cg, k_og, K0, k_cK, k_oK, k1_Ik, k2_Ik,
+     k_ex_g, k_ex_K, tau_Ik, BF_rest, VT_rest, s_BF, s_VT) = \
+    (Current_Parameters[k] if k in Current_Parameters else old_parameters[k] for k in [
+     "k1c", "k2c", "k3c", "k4c", "k1o", "k2o", "k3o", "k4o",
+     "g0", "k_cg", "k_og", "K0", "k_cK", "k_oK", "k1_Ik", "k2_Ik",
+     "k_ex_g", "k_ex_K", "tau_Ik", "BF_rest", "VT_rest", "s_BF", "s_VT"])
+
     # added params
     (Kp_ao, Kf_ao, Kb_ao, Kv_ao, theta_ao_max, Kp_mi, Kf_mi, Kb_mi, Kv_mi, theta_mi_max, Kp_po,
     Kf_po, Kb_po, Kv_po, theta_po_max, Kp_tr, Kf_tr, Kb_tr, Kv_tr, theta_tr_max, alpha_O2, R_po, R_mi, R_tr,
@@ -400,7 +410,11 @@ def simulate_cpu(
     scale_param1, scale_param3, scale_param4, scale_param6,
      Pa_O2_lower, rise_time_atr, rise_time_ven,
      fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale,
-     VAflow_max])
+     VAflow_max,
+     # Ben-Tal Layer 1 (order matches All_derivatives_njit.py unpack)
+     k1c, k2c, k3c, k4c, k1o, k2o, k3o, k4o,
+     g0, k_cg, k_og, K0, k_cK, k_oK, k1_Ik, k2_Ik,
+     k_ex_g, k_ex_K, tau_Ik, BF_rest, VT_rest, s_BF, s_VT])
 
     # Solve ODE in one go
     if USE_NJIT_RK23:

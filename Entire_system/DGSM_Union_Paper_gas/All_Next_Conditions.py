@@ -63,6 +63,17 @@ def make_fresh_storage():
         "tidal_store": np.zeros(80000),
         "VAflow_store": np.zeros(80000),
 
+        # Ben-Tal Layer 1 diagnostics (see Bental_Layer1.py)
+        "gt_store": np.zeros(80000),
+        "K_store": np.zeros(80000),
+        "vc_store": np.zeros(80000),
+        "vo_store": np.zeros(80000),
+        "Ik_store": np.zeros(80000),
+        "PAO2_store": np.zeros(80000),
+        "PACO2_store": np.zeros(80000),
+        "Pd5O2_store": np.zeros(80000),
+        "Pd5CO2_store": np.zeros(80000),
+
         "Q_pp_store": np.zeros(80000),
         "dP_rv_dt_store": np.zeros(80000),
         "dP_lv_dt_store": np.zeros(80000),
