@@ -1,5 +1,32 @@
 # OpenCRS
 
+> **Fork note (zunleashed/OpenCRS, Zone 5 fork).** This is a fork of
+> [Sheng-Ya/OpenCRS](https://github.com/Sheng-Ya/OpenCRS) at upstream commit
+> `f0c3c4612f310017f07d5e67353d7a770034c396`, MIT licence (see `LICENSE`).
+> Upstream is unchanged except for exactly two changes, both to raise the
+> ventilatory ceiling so the model can simulate exercise up to ~95% VO2max:
+>
+> 1. **VAflow clamp parameterised** — `Entire_system/DGSM_Union_Paper_gas/All_derivatives_njit.py:242`:
+>    `VAflow = min(max(VAflow, 0.04), 1.6)` → `min(max(VAflow, 0.04), VAflow_max)`,
+>    with new parameter `VAflow_max` (default **3.5 L/s**, added to
+>    `Entire_system/fixed_params.py` and to
+>    `Entire_system/DGSM_Union_Paper_gas/fixed_params.py`; threaded through
+>    `Samples_for_DGSM_Union.py` as the last entry of `Input_Parameters` and
+>    unpacked as the last entry in `All_derivatives_njit.njit_compatible`).
+>    3.5 L/s was set by measurement: the unclamped ventilatory drive at 95%
+>    VO2max was 2.8–3.5 L/s, so 3.5 covers it with a small margin. It is NOT
+>    a physiological ceiling — a maximal-ventilation soft ceiling (~2.2–2.5
+>    L/s) is a later refinement, not this change.
+> 2. **Breath-timing spline grid extended** — `Entire_system/DGSM_Union_Paper_gas/Samples_for_DGSM_Union.py:124`
+>    (`minimise_breathing`): `np.linspace(0.04, 1.6, 200)` →
+>    `np.linspace(0.04, VAflow_max, 440)`, keeping the original ~0.0078 L/s
+>    knot spacing; `VAflow_max` is passed in from `simulate_cpu`.
+>
+> Everything else — model equations, parameters, calibration — is upstream
+> as of `f0c3c46`. Evaluation of this fork (Protocol B, paper test, FiCO2
+> 8%): https://github.com/zunleashed/metabolisim-exercise-eval, README
+> section "OpenCRS fork — raised VAflow clamp".
+
 A closed-loop cardiorespiratory model: a lumped-parameter cardiovascular system
 coupled to respiratory mechanics and gas exchange, under baroreflex and
 chemoreflex control, simulated at rest and during exercise.

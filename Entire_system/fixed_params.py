@@ -15,6 +15,10 @@ Parameters = {
     # "VA_rest": 0.067,
     "Pmax": 50.0,
     "Pmax_dot": 1000.0,
+    # Fork (Z5): maximum alveolar flow used by the VAflow clamp in
+    # All_derivatives_njit.py (was a hardcoded 1.6 L/s literal). Default
+    # 3.5 L/s covers the measured unclamped Z5 drive (2.8-3.5 L/s).
+    "VAflow_max": 3.5,
     # "E_rs": 21.9,
     # "R_rs": 3.02,
     # "C_jp": 3.72,

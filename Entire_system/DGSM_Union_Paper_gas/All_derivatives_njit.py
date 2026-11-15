@@ -191,7 +191,8 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
      DV_sv, DT_s, DT_v, Dmet, Fi_CO2, Fi_O2, Ta, T1, T2, VL_CO2, VL_O2, KCSFCO2, VB, tauMR, VTCO2, VTO2, tau_MRV,
      scale_param1, scale_param3, scale_param4, scale_param6,
      Pa_O2_lower, rise_time_atr, rise_time_ven,
-     fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale
+     fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale,
+     VAflow_max
     ) = Input_Parameters
 
     # Determine the correct index based on t
@@ -239,7 +240,7 @@ def njit_compatible(t, state, num_removed, i, BUFFER_LIMIT, all_time, Input_Para
 
     G3 = KpO2 * ((PAMO2_nominal - PamO2) ** scale_param1) if PamO2 < PAMO2_nominal else 0
     VAflow = VA_rest * (KpCO2 * PamCO2 + KcCO2 * PmbCO2 + G3 + KcMRV * max(0, MRV) - (KpCO2 + KcCO2) * PaCO2_n)
-    VAflow = min(max(VAflow, 0.04), 1.6)
+    VAflow = min(max(VAflow, 0.04), VAflow_max)
     VD = GV_dead * VAflow + V0_dead
 
     if time_since_last_breath > (t1 + t2) or t == 0:

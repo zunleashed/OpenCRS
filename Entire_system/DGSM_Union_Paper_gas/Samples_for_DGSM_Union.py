@@ -116,12 +116,14 @@ num_resp_control = len(required_resp_control_keys)
 
 IC_overall = np.concatenate((IC_cardio, IC_cardio_contr, IC_gas, IC_resp_contr))
 
-def minimise_breathing(t1, t2, GV_dead, V0_dead, lambda1, lambda2, n, Pmax, Pmax_dot, E_rs, R_rs, P_ao):
+def minimise_breathing(t1, t2, GV_dead, V0_dead, lambda1, lambda2, n, Pmax, Pmax_dot, E_rs, R_rs, P_ao, VAflow_max=3.5):
     dt = 0.001 # must edit in Resp_Control_Breath_Optimiser too
     bounds = [(0.5, 6), (0.5, 9)]  # [t1, t2]
     tolerance = 0.0001
 
-    VAflow_vals = np.linspace(0.04, 1.6, 200)
+    # Fork (Z5): grid extended from 0.04-1.6 to 0.04-VAflow_max L/s.
+    # 440 points keeps the original ~0.0078 L/s knot spacing.
+    VAflow_vals = np.linspace(0.04, VAflow_max, 440)
     # VAflow_repeated = np.repeat(VAflow_vals, 3)
 
     VD = GV_dead * VAflow_vals + V0_dead
@@ -328,9 +330,9 @@ def simulate_cpu(
     "MO2_bp", "MRTCO2_basal", "MRTO2_basal", "MRCO2", "MRO2", "s"])
 
     # Resp control
-    (GV_dead, KcCO2, KcMRV, KpCO2, KpO2, V0_dead, VA_rest, lambda1, lambda2, n, Pmax, Pmax_dot, E_rs, R_rs, P_ao) = \
+    (GV_dead, KcCO2, KcMRV, KpCO2, KpO2, V0_dead, VA_rest, lambda1, lambda2, n, Pmax, Pmax_dot, E_rs, R_rs, P_ao, VAflow_max) = \
     (Current_Parameters[k] if k in Current_Parameters else old_parameters[k] for k in ["GV_dead", "KcCO2", "KcMRV", "KpCO2", "KpO2",
-   "V0_dead", "VA_rest", "lambda1", "lambda2", "n", "Pmax", "Pmax_dot", "E_rs", "R_rs", "P_ao"])
+   "V0_dead", "VA_rest", "lambda1", "lambda2", "n", "Pmax", "Pmax_dot", "E_rs", "R_rs", "P_ao", "VAflow_max"])
 
     # added params
     (Kp_ao, Kf_ao, Kb_ao, Kv_ao, theta_ao_max, Kp_mi, Kf_mi, Kb_mi, Kv_mi, theta_mi_max, Kp_po,
@@ -368,7 +370,7 @@ def simulate_cpu(
     # determine the correct breathing profile
     if breath_coef is None:
         cs_t1, cs_t2, knots_1, knots_2 = (minimise_breathing(1.5,1.85, GV_dead, V0_dead, lambda1, lambda2, n, Pmax,
-                                                             Pmax_dot, E_rs, R_rs, P_ao))
+                                                             Pmax_dot, E_rs, R_rs, P_ao, VAflow_max))
     else:
         cs_t1, cs_t2, knots_1, knots_2 = breath_coef
 
@@ -397,7 +399,8 @@ def simulate_cpu(
     DV_sv, DT_s, DT_v, Dmet, Fi_CO2, Fi_O2, Ta, T1, T2, VL_CO2, VL_O2, KCSFCO2, VB, tauMR, VTCO2, VTO2, tau_MRV,
     scale_param1, scale_param3, scale_param4, scale_param6,
      Pa_O2_lower, rise_time_atr, rise_time_ven,
-     fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale])
+     fall_time_ven, ahead1, theta_min, delta_P, r, l, V_nominal, V_scale,
+     VAflow_max])
 
     # Solve ODE in one go
     if USE_NJIT_RK23:
